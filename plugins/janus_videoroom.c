@@ -6422,7 +6422,6 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 	gchar *bus_debug_info;
 	if (bus_msg != NULL)
 	{
-		prinf(GST_MESSAGE_TYPE(bus_msg));
 
 		switch (GST_MESSAGE_TYPE(bus_msg))
 		{
