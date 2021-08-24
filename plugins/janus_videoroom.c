@@ -6422,6 +6422,8 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 	gchar *bus_debug_info;
 	if (bus_msg != NULL)
 	{
+		JANUS_LOG(LOG_ERR, "CARBYNE:: Go BUS  error  %s\n", GST_MESSAGE_TYPE(bus_msg));
+
 		switch (GST_MESSAGE_TYPE(bus_msg))
 		{
 		case GST_MESSAGE_ERROR:
@@ -6436,9 +6438,9 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 				JANUS_LOG(LOG_ERR, "CARBYNE:: quiting main loop\n");
 				g_main_loop_quit(loop);
 			}
-			if(bus_err->code == 3215){
+			if (bus_err->code == 3215)
+			{
 				JANUS_LOG(LOG_ERR, "CARBYNE:: gstreamer test error\n");
-
 			}
 			break;
 		case GST_MESSAGE_EOS:
