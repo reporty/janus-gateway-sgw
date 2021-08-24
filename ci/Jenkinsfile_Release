@@ -2,7 +2,7 @@
 def appVersion = ''
 gitCredentialsId = 'e4729b13-caae-4669-972f-5307ae6309f4'
 awsCredentialsId = 'dab6216e-af1e-45e8-b957-58796cc47fa2'
-appGitUrl = 'hhttps://github.com/carbyne911/WGWService.git'
+appGitUrl = 'https://github.com/carbyne911/WGWService.git'
 imageName = 'wgw_service'
 
 pipeline {
@@ -32,6 +32,12 @@ pipeline {
         CODE_DEPLOY_STACK = 'QA'
     }
     stages {
+         stage ('Checkout Code') {
+            steps {
+            echo 'checkout Code'
+            checkout([$class: 'GitSCM', branches: [[name: '*/$GIT_BRANCH']], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'CloneOption', noTags: false, reference: '', shallow: false, timeout: 10], [$class: 'SubmoduleOption', disableSubmodules: false, parentCredentials: true, recursiveSubmodules: true, reference: '', trackingSubmodules: false]], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'e4729b13-caae-4669-972f-5307ae6309f4', url: 'https://github.com/carbyne911/WGWService.git']]])
+            }    
+        }
         stage('Parsing WGW Build Version') {
             steps {
                 script {

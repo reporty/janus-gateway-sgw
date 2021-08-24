@@ -19,7 +19,7 @@ pipeline {
         }
     }
 	parameters {
-        gitParameter branchFilter: 'origin/(.*)', defaultValue: 'feature/REP-48994', name: 'GIT_BRANCH', type: 'PT_BRANCH'
+        gitParameter branchFilter: 'origin/(.*)', defaultValue: 'develop', name: 'GIT_BRANCH', type: 'PT_BRANCH'
         string(name: 'Stack', defaultValue: 'dev', description: 'Name of the Stack')
 
     }
