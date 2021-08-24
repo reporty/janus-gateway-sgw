@@ -6471,7 +6471,7 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 			break;
 		}
 		default:
-			JANUS_LOG(LOG_VERB, "CARBYNE::GST BUS Unexpected message received.\n");
+			JANUS_LOG(LOG_VERB, "CARBYNE::GST BUS Unexpected message received with code %s: %d (%s) ...\n", GST_OBJECT_NAME(bus_msg->src), bus_err->code, bus_err->message ? bus_err->message : "??");
 			break;
 		}
 	}
