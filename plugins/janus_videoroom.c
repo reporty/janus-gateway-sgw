@@ -6419,10 +6419,11 @@ void janus_videoroom_incoming_rtp(janus_plugin_session *handle, janus_plugin_rtp
 static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 {
 	GError *bus_err;
+	GError *bus_warn;
 	gchar *bus_debug_info;
 	if (bus_msg != NULL)
 	{
-
+		
 		switch (GST_MESSAGE_TYPE(bus_msg))
 		{
 		case GST_MESSAGE_ERROR:
@@ -6437,7 +6438,7 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 				JANUS_LOG(LOG_ERR, "CARBYNE:: quiting main loop\n");
 				g_main_loop_quit(loop);
 			}
-			
+
 			break;
 		case GST_MESSAGE_EOS:
 			JANUS_LOG(LOG_VERB, "CARBYNE:: GST BUS End-Of-Stream reached.\n");
@@ -6470,8 +6471,14 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 			}
 			break;
 		}
+		case GST_MESSAGE_WARNING:
+			gst_message_parse_warning(bus_msg, &bus_warn, &bus_debug_info);
+
+			JANUS_LOG(LOG_WARN, "CARBYNE:: Got GST BUS  WARNING received from element %s: %d (%s) ...\n", GST_OBJECT_NAME(bus_msg->src), bus_warn->code, bus_warn->message ? bus_warn->message : "??");
+			JANUS_LOG(LOG_WARN, "CARBYNE:: GST BUS Debugging information: %s\n", bus_debug_info ? bus_debug_info : "none");
+			break;
 		default:
-			JANUS_LOG(LOG_VERB, "CARBYNE::GST BUS Unexpected message received with code %s: %d (%s) ...\n", GST_OBJECT_NAME(bus_msg->src), bus_err->code, bus_err->message ? bus_err->message : "??");
+			JANUS_LOG(LOG_VERB, "CARBYNE::GST BUS Unexpected message received \n");
 			break;
 		}
 	}
@@ -6915,7 +6922,8 @@ void set_null_state_except_rtsp_client_sink(janus_gstr *gstr)
 	gst_iterator_free(it);
 	return;
 }
-
+// count num of attempts
+// make it reconnect until succssusfull
 static void *janus_gst_thread_runner(void *data)
 {
 	JANUS_LOG(LOG_INFO, "---------------START GST THREAD RUNNER ----\n");
