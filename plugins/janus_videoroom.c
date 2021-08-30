@@ -1599,6 +1599,7 @@ typedef struct janus_videoroom_session
 	volatile gint destroyed;
 	volatile gint rtsprunAudio; /*CARBYNE-GST*/
 	volatile gint rtsprunVideo; /*CARBYNE-GST*/
+
 	janus_mutex mutex;
 	janus_refcount ref;
 	/*CARBYNE-GST*/
@@ -1807,7 +1808,7 @@ typedef struct janus_videoroom_rtp_relay_packet
 	/* The following is only relevant for datachannels */
 	gboolean textdata;
 } janus_videoroom_rtp_relay_packet;
-
+int rtspServerConnection = 0; /*CARBYNE-GST*/
 /* Start / stop recording */
 static void janus_videoroom_recorder_create(janus_videoroom_publisher *participant, gboolean audio, gboolean video, gboolean data);
 static void janus_videoroom_recorder_close(janus_videoroom_publisher *participant);
@@ -6415,7 +6416,7 @@ void janus_videoroom_incoming_rtp(janus_plugin_session *handle, janus_plugin_rtp
 /*CARBYNE-GST*/
 #define GST_WAIT_TIMEOUT_FROM_IDLE_TO_PLAY_NSEC 500000000 //0.5s
 #define GST_FAIL_AFTER_TCP_TIMEOUT_MICROSEC 5000000		  //5s
-
+#define GST_RTSP_CLIENT_SINK_ERROR_CODE 9				  //
 static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 {
 	GError *bus_err;
@@ -6423,7 +6424,7 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 	gchar *bus_debug_info;
 	if (bus_msg != NULL)
 	{
-		
+
 		switch (GST_MESSAGE_TYPE(bus_msg))
 		{
 		case GST_MESSAGE_ERROR:
@@ -6432,7 +6433,7 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 			JANUS_LOG(LOG_ERR, "CARBYNE:: GST BUS Debugging information: %s\n", bus_debug_info ? bus_debug_info : "none");
 			g_clear_error(&bus_err);
 			g_free(bus_debug_info);
-			//g_atomic_int_set(rtspRun,0);
+			rtspServerConnection = 1;
 			if (g_main_loop_is_running(loop))
 			{
 				JANUS_LOG(LOG_ERR, "CARBYNE:: quiting main loop\n");
@@ -6476,6 +6477,15 @@ static gboolean busCall(GstBus *bus, GstMessage *bus_msg, GMainLoop *loop)
 
 			JANUS_LOG(LOG_WARN, "CARBYNE:: Got GST BUS  WARNING received from element %s: %d (%s) ...\n", GST_OBJECT_NAME(bus_msg->src), bus_warn->code, bus_warn->message ? bus_warn->message : "??");
 			JANUS_LOG(LOG_WARN, "CARBYNE:: GST BUS Debugging information: %s\n", bus_debug_info ? bus_debug_info : "none");
+			int warning_code = bus_warn->code;
+			if (warning_code == GST_RTSP_CLIENT_SINK_ERROR_CODE)
+			{
+				JANUS_LOG(LOG_WARN, "CARBYNE:: GST_RTSP_CLIENT_SINK_ERROR_CODE ----");
+				rtspServerConnection = 1;
+			}
+
+			g_clear_error(&bus_warn);
+			g_free(bus_debug_info);
 			break;
 		default:
 			JANUS_LOG(LOG_VERB, "CARBYNE::GST BUS Unexpected message received \n");
@@ -6924,8 +6934,10 @@ void set_null_state_except_rtsp_client_sink(janus_gstr *gstr)
 }
 // count num of attempts
 // make it reconnect until succssusfull
+int count_of_retrys = 0;
 static void *janus_gst_thread_runner(void *data)
 {
+
 	JANUS_LOG(LOG_INFO, "---------------START GST THREAD RUNNER ----\n");
 	janus_gst_thread_parameters *params = (janus_gst_thread_parameters *)data;
 	if (params == NULL)
@@ -6941,6 +6953,9 @@ static void *janus_gst_thread_runner(void *data)
 	JANUS_LOG(LOG_INFO, "CARBYNE:::::---------------GST THREAD RUNNER  BEFORE RECONNECT  LOOP-------%s\n", logstr);
 	do
 	{
+		JANUS_LOG(LOG_INFO, "CARBYNE:::::---------------GST THREAD RUNNER  BEFORE RECONNECT  LOOP-------%s\n", logstr);
+		JANUS_LOG(LOG_INFO, "CARBYNE:::::---------------GST THREAD RUNNER  BEFORE RECONNECT  COUNTER------- %d\n", count_of_retrys);
+
 		g_mutex_lock(&params->gstr.stop_mutex); //prevent stop , before start
 		g_atomic_int_set(&params->gst_run_flag, 1);
 		g_atomic_int_set(&params->gstr.gst_defined_flag, 1);
@@ -6995,6 +7010,7 @@ static void *janus_gst_thread_runner(void *data)
 					  g_atomic_int_get(&params->gst_run_flag));
 			break;
 		}
+
 	} while (1);
 
 	JANUS_LOG(LOG_INFO, "---------------before CLEANUP  GST THREAD RUNNER -------%s\n", logstr);

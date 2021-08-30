@@ -28,7 +28,7 @@ ENV AWS_S3_BUCKET_PATH_UPDATE_FOLDER=s3://carbyne-deployment-conf/wgw-service/$J
 ENV DEPLOYMENT_CONF_VERSION=1
 ENV WGW_LOG_FILE_PATH=/home/ubuntu/logs/wgw.logs
 ENV EC2_ID=instance_id
-
+ENV SGW_PORT=1935
 ENV AWS_CREDENTIALS_ACCESS_KEY_ID=-1
 ENV AWS_CREDENTIALS_SECRET_ACCESS_KEY=-1
 ENV AWS_CREDENTIALS_PROFILE_NAME=default
@@ -124,31 +124,15 @@ RUN cd /home/ubuntu \
 RUN apt-get install cron
 
 # copy admin script
-COPY scripts/admin_clean_room.sh /home/ubuntu
 
-COPY scripts/is_health.sh /home/ubuntu
-RUN chmod 777 /home/ubuntu/is_health.sh 
-
-# copy all of the needed files
-COPY aws/admin_clean_room.zip /home/ubuntu
-COPY config/janus.jcfg /home/ubuntu
-COPY config/janus.transport.http.jcfg /home/ubuntu
-COPY config/janus.transport.websockets.jcfg /home/ubuntu
-COPY config/janus.plugin.videoroom.jcfg /home/ubuntu
-COPY scripts/systemctl3.py /usr/bin/systemctl
-COPY entrypoint.sh  /home/ubuntu
-COPY config/amazon-cloudwatch-agent.json /home/ubuntu
 
 RUN mkdir /home/ubuntu/logs/ \
     && touch $WGW_LOG_FILE_PATH \
     && chmod 777 $WGW_LOG_FILE_PATH
 # test and change the premissions of systemctl
-RUN test -L /bin/systemctl || ln -sf /usr/bin/systemctl /bin/systemctl
-RUN chmod +x /usr/bin/systemctl
 
-# change the premissions of entrypoint
-RUN chmod +x /home/ubuntu/entrypoint.sh \
-    && sed -i -e 's/\r$//' /home/ubuntu/entrypoint.sh
+
+
 
 
 
@@ -157,8 +141,6 @@ RUN wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/ama
     && dpkg -i amazon-cloudwatch-agent.deb \
     && rm amazon-cloudwatch-agent.deb
 
-# run admin script
-RUN chmod 777 /home/ubuntu/admin_clean_room.sh
 
 
 # install additional libs
@@ -229,10 +211,18 @@ RUN cd /home/ubuntu/ \
     && rm -rf ./paho.mqtt.c
 
 
+# COPY ../ /home/ubuntu/WGWService
+
 # clone wgw code
+# 
+COPY /ci/deployment/scripts/deploy-scripts/wgw_version /home/ubuntu/wgw_version
+COPY /plugins/janus_videoroom.c /home/ubuntu/janus_videoroom.c
+
 RUN cd /home/ubuntu/  \  
+   && echo $(cat /home/ubuntu/wgw_version) \
    && git clone -b "${WGW_SERVICE_GIT_BRANCH}" --single-branch https://github.com/reporty/WGWService.git \
-   && cd "$JANUS_DIR" \   
+   && cp /home/ubuntu/janus_videoroom.c /home/ubuntu/WGWService/plugins/janus_videoroom.c \
+   && cd /home/ubuntu/WGWService \   
    && sh autogen.sh \   
    && ./configure --prefix=/opt/janus \   
    && make &&  make install  \   
@@ -246,12 +236,6 @@ RUN apt-get install -y nodejs-dev node-gyp libssl1.0-dev
 # install node
 RUN apt-get install -y nodejs npm  \
     && apt-get install npm
-
-# install admin zip
-RUN  cd /home/ubuntu/ \ 
-    && unzip admin_clean_room.zip \ 
-    && cd admin_clean_room \ 
-    && npm i ws
 
 
 # link library
@@ -324,6 +308,34 @@ EXPOSE 1937
 EXPOSE 443
 EXPOSE 20000-40000                                                                                                  
 EXPOSE 20000-40000/udp
+
+
+COPY ./ci/scripts/is_health.sh /home/ubuntu
+RUN chmod 777 /home/ubuntu/is_health.sh 
+
+# copy all of the needed files
+COPY ./ci/aws/admin_clean_room.zip /home/ubuntu
+COPY ./ci/config/janus.jcfg /home/ubuntu
+COPY ./ci/config/janus.transport.http.jcfg /home/ubuntu
+COPY ./ci/config/janus.transport.websockets.jcfg /home/ubuntu
+COPY ./ci/config/janus.plugin.videoroom.jcfg /home/ubuntu
+COPY ./ci/scripts/systemctl3.py /usr/bin/systemctl
+COPY ./ci/entrypoint.sh  /home/ubuntu
+COPY ./ci/config/amazon-cloudwatch-agent.json /home/ubuntu
+COPY ./ci/scripts/admin_clean_room.sh /home/ubuntu
+# change the premissions of entrypoint
+RUN chmod +x /home/ubuntu/entrypoint.sh \
+    && sed -i -e 's/\r$//' /home/ubuntu/entrypoint.sh
+# run admin script
+RUN chmod 777 /home/ubuntu/admin_clean_room.sh
+RUN test -L /bin/systemctl || ln -sf /usr/bin/systemctl /bin/systemctl
+RUN chmod +x /usr/bin/systemctl
+# install admin zip
+RUN  cd /home/ubuntu/ \ 
+    && unzip admin_clean_room.zip \ 
+    && cd admin_clean_room \ 
+    && npm i ws
+
 
 
 
