@@ -168,6 +168,9 @@ static const char *keepalive_id = "keepalive";
 static GHashTable *sessions = NULL;
 static janus_mutex sessions_mutex = JANUS_MUTEX_INITIALIZER;
 
+static int g_shc_ref_counter = 0;
+static janus_mutex shc_ref_counter_mutex = JANUS_MUTEX_INITIALIZER;
+
 static void janus_http_session_destroy(janus_http_session *session) {
 	if(session && g_atomic_int_compare_and_exchange(&session->destroyed, 0, 1))
 		janus_refcount_decrease(&session->ref);
@@ -1343,7 +1346,11 @@ static int janus_http_handler(void *cls, struct MHD_Connection *connection,
        /* CARBYNE-SHC start */
 	if(session_path != NULL && !strcmp(session_path, "SanityHealthCheck"))
         {
-               JANUS_LOG(LOG_VERB, " SanityHealthCheck processing IN\n");
+               JANUS_LOG(LOG_VERB, " SanityHealthCheck processing IN  g_shc_ref_counter:%d\n", g_shc_ref_counter);
+               janus_mutex_lock(&shc_ref_counter_mutex);
+               g_shc_ref_counter= g_shc_ref_counter++;
+               janus_mutex_unlock(&shc_ref_counter_mutex);
+
                /* The info REST endpoint, if contacted through a GET, provides information on the Janus core */
                gboolean token_not_valid = TRUE;
                gboolean no_resources = TRUE;
@@ -1354,6 +1361,9 @@ static int janus_http_handler(void *cls, struct MHD_Connection *connection,
                       ret = MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, response); //400
                       MHD_destroy_response(response);
                       JANUS_LOG(LOG_VERB, " SanityHealthCheck processing OUT, MHD_HTTP_BAD_REQUEST\n");
+	              janus_mutex_lock(&shc_ref_counter_mutex);
+                      g_shc_ref_counter= g_shc_ref_counter--;
+                      janus_mutex_unlock(&shc_ref_counter_mutex);
                       goto done;
                }
 
@@ -1366,6 +1376,9 @@ static int janus_http_handler(void *cls, struct MHD_Connection *connection,
                         ret = MHD_queue_response(connection, MHD_HTTP_UNAUTHORIZED, response); //401
                         MHD_destroy_response(response);
                         JANUS_LOG(LOG_VERB, " SanityHealthCheck processing OUT, MHD_HTTP_UNAUTHORIZED\n");
+                        janus_mutex_lock(&shc_ref_counter_mutex);
+                        g_shc_ref_counter= g_shc_ref_counter--;
+                        janus_mutex_unlock(&shc_ref_counter_mutex);
                         goto done;
 		}
 		if(!gateway->carbyne_is_sanityhealthcheck_resources_available(&janus_http_transport))
@@ -1375,6 +1388,9 @@ static int janus_http_handler(void *cls, struct MHD_Connection *connection,
                       ret = MHD_queue_response(connection, MHD_HTTP_INTERNAL_SERVER_ERROR, response); //500
                       MHD_destroy_response(response);
                       JANUS_LOG(LOG_VERB, " SanityHealthCheck processing OUT, MHD_HTTP_INTERNAL_SERVER_ERROR\n");
+                      janus_mutex_lock(&shc_ref_counter_mutex);
+                      g_shc_ref_counter= g_shc_ref_counter--;
+                      janus_mutex_unlock(&shc_ref_counter_mutex);
                       goto done;
 		}
 
@@ -1383,6 +1399,9 @@ static int janus_http_handler(void *cls, struct MHD_Connection *connection,
                 ret = MHD_queue_response(connection, MHD_HTTP_OK, response); //200
                 MHD_destroy_response(response);
                 JANUS_LOG(LOG_VERB, " SanityHealthCheck processing OUT, MHD_HTTP_OK\n");
+                janus_mutex_lock(&shc_ref_counter_mutex);
+                g_shc_ref_counter= g_shc_ref_counter--;
+                janus_mutex_unlock(&shc_ref_counter_mutex);
                 goto done;
         }
         /* CARBYNE-SHC end */
